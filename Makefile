@@ -4,7 +4,7 @@ PORT ?= 8000
 
 serve: ## Start development server on port 8000
 	@echo "Starting server at http://localhost:$(PORT)"
-	@python3 -m http.server $(PORT)
+	@exec python3 -m http.server $(PORT)
 
 open: ## Open browser to localhost:8000
 	@open http://localhost:$(PORT)
@@ -12,7 +12,7 @@ open: ## Open browser to localhost:8000
 dev: ## Start server and open browser
 	@echo "Starting server at http://localhost:$(PORT)"
 	@open http://localhost:$(PORT) &
-	@python3 -m http.server $(PORT)
+	@exec python3 -m http.server $(PORT)
 
 clean: ## Remove generated files
 	@echo "Nothing to clean"
