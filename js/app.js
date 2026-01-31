@@ -58,6 +58,7 @@ class WordRunnerApp {
             // Progress
             progressBar: document.getElementById('progress-bar'),
             progressText: document.getElementById('progress-text'),
+            timeRemaining: document.getElementById('time-remaining'),
 
             // Text input
             textInput: document.getElementById('text-input'),
@@ -83,6 +84,7 @@ class WordRunnerApp {
             this.engine.setWPM(wpm);
             this.saveWPM(wpm);
             this.updateWPMDisplay();
+            this.updateProgress(this.engine.getProgress());
         });
 
         // Reset WPM button
@@ -123,6 +125,17 @@ class WordRunnerApp {
         this.engine.onProgress = (progress) => {
             this.updateProgress(progress);
         };
+
+        this.engine.onParagraphBreak = () => {
+            this.showParagraphBreak();
+        };
+    }
+
+    showParagraphBreak() {
+        // Briefly show empty/blank display for paragraph break
+        this.elements.wordBefore.textContent = '';
+        this.elements.wordOrp.textContent = '¶';
+        this.elements.wordAfter.textContent = '';
     }
 
     handleKeyboard(e) {
@@ -164,6 +177,7 @@ class WordRunnerApp {
         this.engine.setWPM(newWPM);
         this.saveWPM(newWPM);
         this.updateWPMDisplay();
+        this.updateProgress(this.engine.getProgress());
     }
 
     updateDisplay(word, context) {
@@ -246,6 +260,20 @@ class WordRunnerApp {
     updateProgress(progress) {
         this.elements.progressBar.style.width = `${progress.percent}%`;
         this.elements.progressText.textContent = `${progress.current} / ${progress.total}`;
+        this.updateTimeRemaining(progress.total - progress.current);
+    }
+
+    updateTimeRemaining(wordsRemaining) {
+        const wpm = parseInt(this.elements.wpmSlider.value, 10);
+        const secondsRemaining = Math.ceil((wordsRemaining / wpm) * 60);
+        const minutes = Math.floor(secondsRemaining / 60);
+        const seconds = secondsRemaining % 60;
+
+        if (minutes > 0) {
+            this.elements.timeRemaining.textContent = `${minutes}m ${seconds}s remaining`;
+        } else {
+            this.elements.timeRemaining.textContent = `${seconds}s remaining`;
+        }
     }
 
     submitText() {

@@ -161,10 +161,20 @@ main {
     transition: width 0.1s linear;
 }
 
-#progress-text {
-    text-align: center;
+.progress-info {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
     color: var(--text-secondary);
     font-size: 0.85rem;
+}
+
+#progress-text {
+    text-align: center;
+}
+
+#time-remaining {
+    text-align: center;
 }
 
 /* Controls */

@@ -18,6 +18,7 @@ export class RSVPEngine {
     constructor() {
         this.words = [];
         this.sentenceStarts = []; // Indices where sentences begin
+        this.paragraphEnds = []; // Indices where paragraphs end
         this.currentIndex = 0;
         this.isPlaying = false;
         this.wpm = 250;
@@ -26,29 +27,47 @@ export class RSVPEngine {
         this.onWordChange = null; // Callback for word changes
         this.onStateChange = null; // Callback for play/pause state
         this.onProgress = null; // Callback for progress updates
+        this.onParagraphBreak = null; // Callback for paragraph breaks
 
         this.setText(DEFAULT_TEXT);
     }
 
     /**
-     * Parse text into words and track sentence boundaries
+     * Parse text into words and track sentence/paragraph boundaries
      * @param {string} text - The text to parse
      */
     setText(text) {
         this.stop();
         this.words = [];
         this.sentenceStarts = [0];
+        this.paragraphEnds = [];
 
-        // Split text into words, preserving punctuation
-        const rawWords = text.trim().split(/\s+/).filter(w => w.length > 0);
+        // Split text into paragraphs first (by double newlines)
+        const paragraphs = text.trim().split(/\n\s*\n/);
+        let wordIndex = 0;
 
-        for (let i = 0; i < rawWords.length; i++) {
-            const word = rawWords[i];
-            this.words.push(word);
+        for (let p = 0; p < paragraphs.length; p++) {
+            const paragraph = paragraphs[p].trim();
+            if (!paragraph) continue;
 
-            // Check if this word ends a sentence
-            if (/[.!?]$/.test(word) && i < rawWords.length - 1) {
-                this.sentenceStarts.push(i + 1);
+            // Split paragraph into words
+            const rawWords = paragraph.split(/\s+/).filter(w => w.length > 0);
+
+            for (let i = 0; i < rawWords.length; i++) {
+                const word = rawWords[i];
+                this.words.push(word);
+
+                // Check if this word ends a sentence
+                if (/[.!?]$/.test(word) && (i < rawWords.length - 1 || p < paragraphs.length - 1)) {
+                    this.sentenceStarts.push(wordIndex + 1);
+                }
+
+                wordIndex++;
+            }
+
+            // Mark end of paragraph (except for the last one)
+            if (p < paragraphs.length - 1 && this.words.length > 0) {
+                this.paragraphEnds.push(this.words.length - 1);
             }
         }
 
@@ -162,11 +181,24 @@ export class RSVPEngine {
      */
     advance() {
         if (this.currentIndex < this.words.length - 1) {
+            // Check if we just finished a paragraph
+            const wasAtParagraphEnd = this.paragraphEnds.includes(this.currentIndex);
+
             this.currentIndex++;
             this.easeInCount++;
             this.notifyWordChange();
             this.notifyProgress();
-            this.scheduleNext();
+
+            // If we crossed a paragraph boundary, show a break
+            if (wasAtParagraphEnd && this.onParagraphBreak) {
+                this.onParagraphBreak();
+                // Add extra delay for paragraph break (500ms)
+                this.timeoutId = setTimeout(() => {
+                    this.scheduleNext();
+                }, 500);
+            } else {
+                this.scheduleNext();
+            }
         } else {
             // Reached the end
             this.pause();
