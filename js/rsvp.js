@@ -69,7 +69,15 @@ export class RSVPEngine {
             const paragraph = paragraphs[p].trim();
             if (!paragraph) continue;
 
-            const rawWords = paragraph.split(/\s+/).filter(w => w.length > 0);
+            // Split on whitespace, and handle hyphens/dashes
+            // - Em/en dashes stay attached: "loops—catching" → "loops—", "catching"
+            // - Double hyphens treated as em dash
+            // - Regular hyphens split cleanly: "self-driving" → "self", "driving"
+            const processedText = paragraph
+                .replace(/(—|–)/g, '$1 ')  // Em/en dashes: keep and add space
+                .replace(/--/g, '— ')  // Double hyphen → em dash + space
+                .replace(/-/g, ' ');  // Single hyphens: replace with space
+            const rawWords = processedText.split(/\s+/).filter(w => w.length > 0);
 
             for (let i = 0; i < rawWords.length; i++) {
                 const word = rawWords[i];

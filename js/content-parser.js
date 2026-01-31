@@ -131,10 +131,14 @@ function processNode(node, items, baseUrl, anchorId, state) {
     if (node.nodeType === Node.TEXT_NODE) {
         const text = node.textContent.trim();
         if (text) {
-            // Split on whitespace, and also after em dash (—), en dash (–), or double hyphen (--)
-            // The dash stays attached to the preceding word: "loops—catching" → "loops—", "catching"
+            // Split on whitespace, hyphens, and dashes
+            // - Em/en dashes stay attached: "loops—catching" → "loops—", "catching"
+            // - Double hyphens treated as em dash: "foo--bar" → "foo—", "bar"
+            // - Regular hyphens split cleanly: "self-driving" → "self", "driving"
             const words = text
-                .replace(/(—|–|--)/g, '$1 ')  // Add space after dashes
+                .replace(/(—|–)/g, '$1 ')  // Em/en dashes: keep and add space
+                .replace(/--/g, '— ')  // Double hyphen → em dash + space
+                .replace(/-/g, ' ')  // Single hyphens: replace with space
                 .split(/\s+/)
                 .filter(w => w.length > 0);
             for (const word of words) {
