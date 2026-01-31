@@ -41,6 +41,7 @@ class WordRunnerApp {
             await this.loadFromURL(urlInfo.url, urlInfo.anchor);
         } else {
             this.showTextInputSection(true);
+            this.updateNavActiveState(true);
             this.updateWPMDisplay();
             this.updateProgress(this.engine.getProgress());
             this.updateDisplayState(DISPLAY_STATE.PAUSED);
@@ -61,6 +62,7 @@ class WordRunnerApp {
             this.sourceUrl = finalUrl;
             this.showSourceURL(finalUrl, title);
             this.showTextInputSection(false);
+            this.updateNavActiveState(false);
 
             this.engine.setContent(items);
 
@@ -113,6 +115,7 @@ class WordRunnerApp {
             timeRemaining: document.getElementById('time-remaining'),
 
             // Navigation
+            logoLink: document.getElementById('logo-link'),
             customTextBtn: document.getElementById('custom-text-btn'),
             loadUrlBtn: document.getElementById('load-url-btn'),
 
@@ -175,16 +178,26 @@ class WordRunnerApp {
             this.resetText();
         });
 
-        // Custom Text navigation button
-        if (this.elements.customTextBtn) {
-            this.elements.customTextBtn.addEventListener('click', () => {
+        // Logo link - go to home/custom text mode
+        if (this.elements.logoLink) {
+            this.elements.logoLink.addEventListener('click', (e) => {
+                e.preventDefault();
                 this.showCustomTextMode();
             });
         }
 
-        // Load URL navigation button
+        // Custom Text navigation link
+        if (this.elements.customTextBtn) {
+            this.elements.customTextBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.showCustomTextMode();
+            });
+        }
+
+        // Load URL navigation link
         if (this.elements.loadUrlBtn) {
-            this.elements.loadUrlBtn.addEventListener('click', () => {
+            this.elements.loadUrlBtn.addEventListener('click', (e) => {
+                e.preventDefault();
                 this.promptLoadUrl();
             });
         }
@@ -574,6 +587,13 @@ class WordRunnerApp {
         }
     }
 
+    // Update active state of navigation links
+    updateNavActiveState(isCustomText) {
+        if (this.elements.customTextBtn) {
+            this.elements.customTextBtn.classList.toggle('active', isCustomText);
+        }
+    }
+
     // Navigate to custom text mode (root URL)
     showCustomTextMode() {
         // Clear URL hash and navigate to root
@@ -583,6 +603,7 @@ class WordRunnerApp {
             this.elements.sourceUrl.classList.add('hidden');
         }
         this.showTextInputSection(true);
+        this.updateNavActiveState(true);
         this.engine.setText(this.engine.getDefaultText());
         this.updateDisplayState(DISPLAY_STATE.PAUSED);
         this.updateDisplay();

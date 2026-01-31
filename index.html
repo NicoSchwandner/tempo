@@ -14,15 +14,20 @@
     </div>
 
     <header>
-        <h1>Word Runner</h1>
-        <p>Speed reading with RSVP and ORP highlighting</p>
-        <div class="nav-buttons">
-            <button id="custom-text-btn">Custom Text</button>
-            <button id="load-url-btn">Load URL</button>
+        <div class="header-content">
+            <a href="#" class="logo" id="logo-link">
+                <span class="logo-icon">▶</span>
+                <span class="logo-text">Word Runner</span>
+            </a>
+            <nav class="main-nav">
+                <a href="#" class="nav-link" id="custom-text-btn">Custom Text</a>
+                <a href="#" class="nav-link" id="load-url-btn">Load URL</a>
+            </nav>
         </div>
-        <p id="source-url" class="hidden">
-            Reading: <a id="source-link" href="#" target="_blank" rel="noopener"></a>
-        </p>
+        <div id="source-url" class="source-bar hidden">
+            <span class="source-label">Reading:</span>
+            <a id="source-link" href="#" target="_blank" rel="noopener"></a>
+        </div>
     </header>
 
     <main>

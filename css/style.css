@@ -28,54 +28,105 @@ body {
 
 /* Header */
 header {
-    text-align: center;
-    padding: 2rem 1rem 1rem;
+    background-color: var(--bg-secondary);
+    border-bottom: 1px solid var(--bg-tertiary);
+    position: sticky;
+    top: 0;
+    z-index: 50;
 }
 
-header h1 {
-    font-size: 2rem;
-    font-weight: 600;
-    margin-bottom: 0.5rem;
-}
-
-header p {
-    color: var(--text-secondary);
-    font-size: 0.95rem;
-}
-
-/* Navigation Buttons */
-.nav-buttons {
+.header-content {
     display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1.5rem;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* Logo */
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+    color: var(--text-primary);
+}
+
+.logo-icon {
+    display: flex;
+    align-items: center;
     justify-content: center;
-    gap: 0.75rem;
-    margin-top: 1rem;
-}
-
-.nav-buttons button {
-    padding: 0.5rem 1rem;
+    width: 32px;
+    height: 32px;
+    background: var(--accent);
+    border-radius: 6px;
     font-size: 0.9rem;
+    color: white;
 }
 
-/* Source URL */
-#source-url {
-    font-size: 0.85rem;
+.logo-text {
+    font-size: 1.25rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+}
+
+.logo:hover .logo-icon {
+    background: var(--accent-hover);
+}
+
+/* Main Navigation */
+.main-nav {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.nav-link {
     color: var(--text-secondary);
-    margin-top: 0.5rem;
+    text-decoration: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: color 0.2s ease, background-color 0.2s ease;
 }
 
-#source-url.hidden {
+.nav-link:hover {
+    color: var(--text-primary);
+    background-color: var(--bg-tertiary);
+}
+
+.nav-link.active {
+    color: var(--accent);
+}
+
+/* Source URL Bar */
+.source-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1.5rem;
+    background-color: var(--bg-tertiary);
+    font-size: 0.85rem;
+}
+
+.source-bar.hidden {
     display: none;
+}
+
+.source-label {
+    color: var(--text-secondary);
 }
 
 #source-link {
     color: var(--accent);
     text-decoration: none;
-    max-width: 400px;
-    display: inline-block;
+    max-width: 500px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    vertical-align: bottom;
 }
 
 #source-link:hover {
@@ -569,8 +620,32 @@ button:active {
 
 /* Responsive */
 @media (max-width: 600px) {
-    header h1 {
-        font-size: 1.5rem;
+    .header-content {
+        padding: 0.5rem 1rem;
+    }
+
+    .logo-text {
+        font-size: 1.1rem;
+    }
+
+    .logo-icon {
+        width: 28px;
+        height: 28px;
+        font-size: 0.8rem;
+    }
+
+    .nav-link {
+        padding: 0.4rem 0.75rem;
+        font-size: 0.8rem;
+    }
+
+    .source-bar {
+        padding: 0.4rem 1rem;
+        font-size: 0.8rem;
+    }
+
+    #source-link {
+        max-width: 200px;
     }
 
     #word-display {
