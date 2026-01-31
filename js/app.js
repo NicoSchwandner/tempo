@@ -106,6 +106,36 @@ class WordRunnerApp {
         document.addEventListener('keydown', (e) => {
             this.handleKeyboard(e);
         });
+
+        // Scroll/swipe for word navigation
+        document.addEventListener('wheel', (e) => {
+            this.handleWheel(e);
+        }, { passive: false });
+    }
+
+    handleWheel(e) {
+        // Ignore if scrolling in textarea
+        if (e.target.tagName === 'TEXTAREA') return;
+
+        // Only handle horizontal scroll
+        if (Math.abs(e.deltaX) < 1) return;
+
+        e.preventDefault();
+
+        // Accumulate scroll delta for smoother trackpad handling
+        this.scrollAccumulator = (this.scrollAccumulator || 0) + e.deltaX;
+
+        // Threshold for triggering word change
+        const threshold = 50;
+
+        if (Math.abs(this.scrollAccumulator) >= threshold) {
+            if (this.scrollAccumulator > 0) {
+                this.engine.nextWord();
+            } else {
+                this.engine.previousWord();
+            }
+            this.scrollAccumulator = 0;
+        }
     }
 
     setupEngine() {

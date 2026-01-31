@@ -265,6 +265,28 @@ export class RSVPEngine {
     }
 
     /**
+     * Move to previous word
+     */
+    previousWord() {
+        if (this.currentIndex > 0) {
+            this.currentIndex--;
+            this.notifyWordChange();
+            this.notifyProgress();
+        }
+    }
+
+    /**
+     * Move to next word
+     */
+    nextWord() {
+        if (this.currentIndex < this.words.length - 1) {
+            this.currentIndex++;
+            this.notifyWordChange();
+            this.notifyProgress();
+        }
+    }
+
+    /**
      * Get the current word
      * @returns {string}
      */
