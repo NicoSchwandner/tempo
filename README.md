@@ -14,20 +14,23 @@ The Optimal Recognition Point is the letter in each word where your eye naturall
 
 - **RSVP Display**: One word at a time, centered on screen
 - **ORP Highlighting**: Optimal letter marked in red
-- **Adjustable Speed**: 100-1000 WPM in steps of 25
+- **Adjustable Speed**: 100-1000 WPM in steps of 25, saved to localStorage
 - **Ease-in**: Gradually ramps up to target speed
+- **Paragraph Breaks**: Visual break between paragraphs with brief pause
+- **Time Remaining**: Shows estimated time left based on WPM
 - **Context View**: When paused, see surrounding words with gradient opacity
 - **Custom Text**: Paste your own text to read
 
-## Keyboard Shortcuts
+## Controls
 
-| Key | Action |
-|-----|--------|
+| Input | Action |
+|-------|--------|
 | Space | Play/Pause |
 | ← | Previous sentence |
 | → | Next sentence |
 | ↑ | Increase WPM (+25) |
 | ↓ | Decrease WPM (-25) |
+| Horizontal scroll/swipe | Previous/Next word |
 
 ## Quick Start
 

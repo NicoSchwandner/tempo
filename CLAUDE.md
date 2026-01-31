@@ -28,12 +28,15 @@ make help     # Show available commands
 
 ## Key Features
 - **ORP Highlighting**: Optimal recognition point letter shown in red
-- **WPM Control**: 100-1000 in steps of 25
+- **WPM Control**: 100-1000 in steps of 25, saved to localStorage
 - **Ease-in**: Gradually ramps up to target speed when starting
-- **Keyboard Shortcuts**:
+- **Paragraph Breaks**: Visual break (¶) between paragraphs with 500ms pause
+- **Time Remaining**: Shows estimated time left based on WPM
+- **Navigation**:
   - Space: Play/Pause
-  - Left/Right: Previous/Next sentence
-  - Up/Down: Adjust WPM ±25
+  - Left/Right arrows: Previous/Next sentence
+  - Up/Down arrows: Adjust WPM ±25
+  - Horizontal scroll/swipe: Previous/Next word
 
 ## Code Conventions
 - ES6 modules
