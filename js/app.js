@@ -4,28 +4,78 @@
 
 import { splitAtORP } from './orp.js';
 import { RSVPEngine } from './rsvp.js';
+import { extractURLFromPath, fetchContent } from './url-loader.js';
+import { parseHTMLToContent } from './content-parser.js';
 
 const STORAGE_KEY_WPM = 'word-runner-wpm';
 const DEFAULT_WPM = 250;
+
+// Display states
+const DISPLAY_STATE = {
+    PLAYING: 'playing',
+    PAUSED: 'paused',
+    LOADING: 'loading',
+    ERROR: 'error',
+    SPECIAL: 'special'
+};
 
 class WordRunnerApp {
     constructor() {
         this.engine = new RSVPEngine();
         this.elements = {};
+        this.currentDisplayState = DISPLAY_STATE.PAUSED;
+        this.sourceUrl = null;
 
         this.init();
     }
 
-    init() {
+    async init() {
         this.cacheElements();
         this.loadSettings();
         this.bindEvents();
         this.setupEngine();
-        this.updateWPMDisplay();
-        this.updateProgress(this.engine.getProgress());
-        this.updateDisplayMode(false); // Start in paused mode showing context
-        // Update display after context is visible so centering works
-        requestAnimationFrame(() => this.updateDisplay());
+
+        // Check for URL in path
+        const urlInfo = extractURLFromPath();
+        if (urlInfo) {
+            await this.loadFromURL(urlInfo.url, urlInfo.anchor);
+        } else {
+            this.updateWPMDisplay();
+            this.updateProgress(this.engine.getProgress());
+            this.updateDisplayState(DISPLAY_STATE.PAUSED);
+            requestAnimationFrame(() => this.updateDisplay());
+        }
+    }
+
+    async loadFromURL(url, anchor = null) {
+        this.updateDisplayState(DISPLAY_STATE.LOADING);
+        this.setLoadingStatus('Fetching article...');
+
+        try {
+            const { html, finalUrl } = await fetchContent(url);
+            this.setLoadingStatus('Extracting content...');
+
+            const { title, items, anchorIndex } = await parseHTMLToContent(html, finalUrl, anchor);
+
+            this.sourceUrl = finalUrl;
+            this.showSourceURL(finalUrl, title);
+
+            this.engine.setContent(items);
+
+            // Jump to anchor position if found
+            if (anchor && anchorIndex > 0) {
+                this.engine.jumpToIndex(anchorIndex);
+            }
+
+            this.updateWPMDisplay();
+            this.updateProgress(this.engine.getProgress());
+            this.updateDisplayState(DISPLAY_STATE.PAUSED);
+            requestAnimationFrame(() => this.updateDisplay());
+
+        } catch (error) {
+            console.error('Failed to load URL:', error);
+            this.showError(error.message || 'Could not fetch article. Check the URL and try again.');
+        }
     }
 
     loadSettings() {
@@ -63,7 +113,23 @@ class WordRunnerApp {
             // Text input
             textInput: document.getElementById('text-input'),
             submitTextBtn: document.getElementById('submit-text-btn'),
-            resetTextBtn: document.getElementById('reset-text-btn')
+            resetTextBtn: document.getElementById('reset-text-btn'),
+
+            // Loading/Error overlays
+            loadingOverlay: document.getElementById('loading-overlay'),
+            loadingStatus: document.getElementById('loading-status'),
+            errorDisplay: document.getElementById('error-display'),
+            errorMessage: document.getElementById('error-message'),
+            dismissErrorBtn: document.getElementById('dismiss-error-btn'),
+
+            // Source URL
+            sourceUrl: document.getElementById('source-url'),
+            sourceLink: document.getElementById('source-link'),
+
+            // Special content
+            specialOverlay: document.getElementById('special-content-overlay'),
+            specialContainer: document.getElementById('special-content-container'),
+            countdownBadge: document.getElementById('countdown-badge')
         };
     }
 
@@ -73,7 +139,7 @@ class WordRunnerApp {
             this.engine.toggle();
         });
 
-        // Start Over button (resets playback position)
+        // Start Over button
         this.elements.startOverBtn.addEventListener('click', () => {
             this.engine.stop();
         });
@@ -102,6 +168,16 @@ class WordRunnerApp {
             this.resetText();
         });
 
+        // Dismiss error button
+        if (this.elements.dismissErrorBtn) {
+            this.elements.dismissErrorBtn.addEventListener('click', () => {
+                this.hideError();
+                this.engine.setText(this.engine.getDefaultText());
+                this.updateDisplayState(DISPLAY_STATE.PAUSED);
+                this.updateDisplay();
+            });
+        }
+
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
             this.handleKeyboard(e);
@@ -111,21 +187,25 @@ class WordRunnerApp {
         document.addEventListener('wheel', (e) => {
             this.handleWheel(e);
         }, { passive: false });
+
+        // Handle hash changes for URL navigation
+        window.addEventListener('hashchange', () => {
+            const urlInfo = extractURLFromPath();
+            if (urlInfo) {
+                this.loadFromURL(urlInfo.url, urlInfo.anchor);
+            }
+        });
     }
 
     handleWheel(e) {
-        // Ignore if scrolling in textarea
         if (e.target.tagName === 'TEXTAREA') return;
-
-        // Only handle horizontal scroll
         if (Math.abs(e.deltaX) < 1) return;
+        // Disable horizontal scroll navigation while playing
+        if (this.engine.isPlaying) return;
 
         e.preventDefault();
 
-        // Accumulate scroll delta for smoother trackpad handling
         this.scrollAccumulator = (this.scrollAccumulator || 0) + e.deltaX;
-
-        // Threshold for triggering word change
         const threshold = 50;
 
         if (Math.abs(this.scrollAccumulator) >= threshold) {
@@ -145,9 +225,10 @@ class WordRunnerApp {
 
         this.engine.onStateChange = (isPlaying) => {
             this.updatePlayButton(isPlaying);
-            this.updateDisplayMode(isPlaying);
-            // Refresh context display when pausing to show current word centered
-            if (!isPlaying) {
+            if (!this.engine.isShowingSpecialContent) {
+                this.updateDisplayState(isPlaying ? DISPLAY_STATE.PLAYING : DISPLAY_STATE.PAUSED);
+            }
+            if (!isPlaying && !this.engine.isShowingSpecialContent) {
                 this.updateDisplay();
             }
         };
@@ -159,17 +240,27 @@ class WordRunnerApp {
         this.engine.onParagraphBreak = () => {
             this.showParagraphBreak();
         };
+
+        this.engine.onSpecialContent = (item, countdown) => {
+            this.showSpecialContent(item, countdown);
+        };
+
+        this.engine.onSpecialCountdownTick = (seconds) => {
+            this.updateCountdown(seconds);
+        };
+
+        this.engine.onSpecialContentEnd = () => {
+            this.hideSpecialContent();
+        };
     }
 
     showParagraphBreak() {
-        // Briefly show empty/blank display for paragraph break
         this.elements.wordBefore.textContent = '';
         this.elements.wordOrp.textContent = '¶';
         this.elements.wordAfter.textContent = '';
     }
 
     handleKeyboard(e) {
-        // Ignore if typing in textarea
         if (e.target.tagName === 'TEXTAREA') return;
 
         switch (e.code) {
@@ -180,12 +271,16 @@ class WordRunnerApp {
 
             case 'ArrowLeft':
                 e.preventDefault();
+                // Always go to previous sentence (clears special content if showing)
                 this.engine.previousSentence();
                 break;
 
             case 'ArrowRight':
                 e.preventDefault();
-                this.engine.nextSentence();
+                // Skip special content if showing, otherwise go to next sentence
+                if (!this.engine.skipSpecialContent()) {
+                    this.engine.nextSentence();
+                }
                 break;
 
             case 'ArrowUp':
@@ -214,13 +309,11 @@ class WordRunnerApp {
         word = word || this.engine.getCurrentWord();
         context = context || this.engine.getContext();
 
-        // Update single word display
         const parts = splitAtORP(word);
         this.elements.wordBefore.textContent = parts.before;
         this.elements.wordOrp.textContent = parts.orp;
         this.elements.wordAfter.textContent = parts.after;
 
-        // Update context display
         this.updateContextDisplay(context);
     }
 
@@ -232,13 +325,37 @@ class WordRunnerApp {
             const span = document.createElement('span');
             span.className = 'context-word';
 
-            // Calculate opacity based on distance from center
             const distance = Math.abs(item.offset);
             const opacity = Math.max(0.2, 1 - (distance * 0.05));
             span.style.opacity = opacity;
 
-            if (item.offset === 0) {
-                // Current word - show with ORP highlighting
+            if (item.type === 'special') {
+                // Show thumbnail or placeholder for special content
+                span.classList.add('context-special');
+                if (item.contentType === 'image') {
+                    // Extract image src and show thumbnail
+                    const srcMatch = item.html.match(/src="([^"]+)"/);
+                    if (srcMatch) {
+                        const img = document.createElement('img');
+                        img.src = srcMatch[1];
+                        img.className = 'context-thumbnail';
+                        img.alt = 'Image';
+                        span.appendChild(img);
+                    } else {
+                        span.textContent = '🖼';
+                    }
+                } else if (item.contentType === 'code') {
+                    span.textContent = '{ }';
+                    span.classList.add('context-code-icon');
+                } else if (item.contentType === 'table') {
+                    span.textContent = '▦';
+                    span.classList.add('context-table-icon');
+                }
+                if (item.offset === 0) {
+                    span.classList.add('context-current');
+                    currentWordElement = span;
+                }
+            } else if (item.offset === 0) {
                 const parts = splitAtORP(item.word);
                 span.innerHTML = `<span class="context-before">${parts.before}</span><span class="context-orp">${parts.orp}</span><span class="context-after">${parts.after}</span>`;
                 span.classList.add('context-current');
@@ -250,7 +367,6 @@ class WordRunnerApp {
             this.elements.contextDisplay.appendChild(span);
         }
 
-        // Center the current word after rendering
         if (currentWordElement) {
             requestAnimationFrame(() => {
                 const parent = this.elements.contextDisplay.parentElement;
@@ -258,23 +374,101 @@ class WordRunnerApp {
                 const containerRect = this.elements.contextDisplay.getBoundingClientRect();
                 const wordRect = currentWordElement.getBoundingClientRect();
 
-                // Calculate word center position relative to container start
                 const wordCenterInContainer = (wordRect.left - containerRect.left) + (wordRect.width / 2);
-
-                // Move container so word center aligns with parent center
                 const translateX = (parentWidth / 2) - wordCenterInContainer;
                 this.elements.contextDisplay.style.transform = `translateX(${translateX}px) translateY(-50%)`;
             });
         }
     }
 
-    updateDisplayMode(isPlaying) {
-        if (isPlaying) {
-            this.elements.wordDisplay.classList.remove('hidden');
-            this.elements.contextDisplay.classList.add('hidden');
+    /**
+     * Update display state - manages visibility of all display areas
+     * @param {string} state - One of DISPLAY_STATE values
+     */
+    updateDisplayState(state) {
+        this.currentDisplayState = state;
+
+        // Hide all first
+        this.elements.wordDisplay?.classList.add('hidden');
+        this.elements.contextDisplay?.classList.add('hidden');
+        this.elements.loadingOverlay?.classList.add('hidden');
+        this.elements.errorDisplay?.classList.add('hidden');
+        this.elements.specialOverlay?.classList.add('hidden');
+
+        // Show appropriate display
+        switch (state) {
+            case DISPLAY_STATE.PLAYING:
+                this.elements.wordDisplay?.classList.remove('hidden');
+                break;
+            case DISPLAY_STATE.PAUSED:
+                this.elements.contextDisplay?.classList.remove('hidden');
+                break;
+            case DISPLAY_STATE.LOADING:
+                this.elements.loadingOverlay?.classList.remove('hidden');
+                break;
+            case DISPLAY_STATE.ERROR:
+                this.elements.errorDisplay?.classList.remove('hidden');
+                break;
+            case DISPLAY_STATE.SPECIAL:
+                this.elements.specialOverlay?.classList.remove('hidden');
+                break;
+        }
+    }
+
+    // Loading state methods
+    setLoadingStatus(message) {
+        if (this.elements.loadingStatus) {
+            this.elements.loadingStatus.textContent = message;
+        }
+    }
+
+    // Error handling
+    showError(message) {
+        if (this.elements.errorMessage) {
+            this.elements.errorMessage.textContent = message;
+        }
+        this.updateDisplayState(DISPLAY_STATE.ERROR);
+    }
+
+    hideError() {
+        this.updateDisplayState(DISPLAY_STATE.PAUSED);
+    }
+
+    // Source URL display
+    showSourceURL(url, title) {
+        if (this.elements.sourceUrl && this.elements.sourceLink) {
+            this.elements.sourceUrl.classList.remove('hidden');
+            this.elements.sourceLink.href = url;
+            this.elements.sourceLink.textContent = title || url;
+        }
+    }
+
+    // Special content handling
+    showSpecialContent(item, countdown) {
+        this.updateDisplayState(DISPLAY_STATE.SPECIAL);
+        if (this.elements.specialContainer) {
+            this.elements.specialContainer.innerHTML = item.html;
+        }
+        this.updateCountdown(countdown);
+    }
+
+    updateCountdown(seconds) {
+        if (this.elements.countdownBadge) {
+            if (seconds === null) {
+                // Hide countdown when paused
+                this.elements.countdownBadge.classList.add('hidden');
+            } else {
+                this.elements.countdownBadge.classList.remove('hidden');
+                this.elements.countdownBadge.textContent = seconds;
+            }
+        }
+    }
+
+    hideSpecialContent() {
+        if (this.engine.isPlaying) {
+            this.updateDisplayState(DISPLAY_STATE.PLAYING);
         } else {
-            this.elements.wordDisplay.classList.add('hidden');
-            this.elements.contextDisplay.classList.remove('hidden');
+            this.updateDisplayState(DISPLAY_STATE.PAUSED);
         }
     }
 
@@ -290,14 +484,30 @@ class WordRunnerApp {
     updateProgress(progress) {
         this.elements.progressBar.style.width = `${progress.percent}%`;
         this.elements.progressText.textContent = `${progress.current} / ${progress.total}`;
-        this.updateTimeRemaining(progress.total - progress.current);
+        this.updateTimeRemaining(progress);
     }
 
-    updateTimeRemaining(wordsRemaining) {
+    updateTimeRemaining(progress) {
         const wpm = parseInt(this.elements.wpmSlider.value, 10);
-        const secondsRemaining = Math.ceil((wordsRemaining / wpm) * 60);
-        const minutes = Math.floor(secondsRemaining / 60);
-        const seconds = secondsRemaining % 60;
+        const wordsRemaining = progress.total - progress.current;
+
+        // Count remaining words (exclude special content already counted)
+        const items = this.engine.getItems();
+        let remainingWordCount = 0;
+        let remainingSpecialCount = 0;
+
+        for (let i = this.engine.currentIndex + 1; i < items.length; i++) {
+            if (items[i].type === 'word') remainingWordCount++;
+            else if (items[i].type === 'special') remainingSpecialCount++;
+        }
+
+        // Time for words + 5 seconds per special item
+        const wordSeconds = (remainingWordCount / wpm) * 60;
+        const specialSeconds = remainingSpecialCount * 5;
+        const totalSeconds = Math.ceil(wordSeconds + specialSeconds);
+
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
 
         if (minutes > 0) {
             this.elements.timeRemaining.textContent = `${minutes}m ${seconds}s remaining`;
@@ -309,15 +519,24 @@ class WordRunnerApp {
     submitText() {
         const text = this.elements.textInput.value.trim();
         if (text) {
+            // Hide source URL when using custom text
+            if (this.elements.sourceUrl) {
+                this.elements.sourceUrl.classList.add('hidden');
+            }
+            this.sourceUrl = null;
             this.engine.setText(text);
-            this.updateDisplayMode(false);
+            this.updateDisplayState(DISPLAY_STATE.PAUSED);
         }
     }
 
     resetText() {
         this.elements.textInput.value = this.engine.getDefaultText();
+        if (this.elements.sourceUrl) {
+            this.elements.sourceUrl.classList.add('hidden');
+        }
+        this.sourceUrl = null;
         this.engine.setText(this.engine.getDefaultText());
-        this.updateDisplayMode(false);
+        this.updateDisplayState(DISPLAY_STATE.PAUSED);
     }
 
     resetWPM() {

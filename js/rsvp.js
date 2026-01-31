@@ -2,6 +2,7 @@
  * RSVP (Rapid Serial Visual Presentation) Engine
  *
  * Handles text parsing, playback timing, and word navigation.
+ * Supports both plain text and content items (words, special content, paragraph breaks).
  */
 
 const DEFAULT_TEXT = `The quick brown fox jumps over the lazy dog. This classic pangram contains every letter of the alphabet at least once.
@@ -14,20 +15,38 @@ Try adjusting the speed to find your optimal reading pace. Most people can comfo
 
 Remember to take breaks. Speed reading requires concentration, and your comprehension will decrease if you're fatigued. Happy reading!`;
 
+const SPECIAL_CONTENT_DURATION = 5; // seconds
+
 export class RSVPEngine {
     constructor() {
         this.words = [];
-        this.sentenceStarts = []; // Indices where sentences begin
-        this.paragraphEnds = []; // Indices where paragraphs end
+        this.items = []; // Content items (words, special, paragraph-break)
+        this.sentenceStarts = [];
+        this.paragraphEnds = [];
         this.currentIndex = 0;
         this.isPlaying = false;
         this.wpm = 250;
         this.timeoutId = null;
-        this.easeInCount = 0; // Track words since playback started
-        this.onWordChange = null; // Callback for word changes
-        this.onStateChange = null; // Callback for play/pause state
-        this.onProgress = null; // Callback for progress updates
-        this.onParagraphBreak = null; // Callback for paragraph breaks
+        this.easeInCount = 0;
+
+        // Special content state
+        this.specialCountdown = 0;
+        this.specialPaused = false;
+        this.countdownIntervalId = null;
+        this.isShowingSpecialContent = false;
+
+        // Navigation state for rapid back-press detection (play mode only)
+        this.lastBackPressTime = 0;
+        this.lastSkipToSentenceIdx = -1; // Index into sentenceStarts array
+
+        // Callbacks
+        this.onWordChange = null;
+        this.onStateChange = null;
+        this.onProgress = null;
+        this.onParagraphBreak = null;
+        this.onSpecialContent = null;
+        this.onSpecialCountdownTick = null;
+        this.onSpecialContentEnd = null;
 
         this.setText(DEFAULT_TEXT);
     }
@@ -39,10 +58,10 @@ export class RSVPEngine {
     setText(text) {
         this.stop();
         this.words = [];
+        this.items = [];
         this.sentenceStarts = [0];
         this.paragraphEnds = [];
 
-        // Split text into paragraphs first (by double newlines)
         const paragraphs = text.trim().split(/\n\s*\n/);
         let wordIndex = 0;
 
@@ -50,14 +69,13 @@ export class RSVPEngine {
             const paragraph = paragraphs[p].trim();
             if (!paragraph) continue;
 
-            // Split paragraph into words
             const rawWords = paragraph.split(/\s+/).filter(w => w.length > 0);
 
             for (let i = 0; i < rawWords.length; i++) {
                 const word = rawWords[i];
                 this.words.push(word);
+                this.items.push({ type: 'word', value: word });
 
-                // Check if this word ends a sentence
                 if (/[.!?]$/.test(word) && (i < rawWords.length - 1 || p < paragraphs.length - 1)) {
                     this.sentenceStarts.push(wordIndex + 1);
                 }
@@ -65,15 +83,60 @@ export class RSVPEngine {
                 wordIndex++;
             }
 
-            // Mark end of paragraph (except for the last one)
             if (p < paragraphs.length - 1 && this.words.length > 0) {
-                this.paragraphEnds.push(this.words.length - 1);
+                this.paragraphEnds.push(this.items.length - 1);
+                this.items.push({ type: 'paragraph-break' });
             }
         }
 
         this.currentIndex = 0;
         this.notifyWordChange();
         this.notifyProgress();
+    }
+
+    /**
+     * Set content items directly (for URL-loaded content)
+     * @param {Array} items - Content items array
+     */
+    setContent(items) {
+        this.stop();
+        this.items = items;
+        this.words = [];
+        this.sentenceStarts = [0];
+        this.paragraphEnds = [];
+
+        let wordIndex = 0;
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            if (item.type === 'word') {
+                this.words.push(item.value);
+                if (/[.!?]$/.test(item.value)) {
+                    this.sentenceStarts.push(wordIndex + 1);
+                }
+                wordIndex++;
+            } else if (item.type === 'paragraph-break') {
+                if (i > 0) {
+                    this.paragraphEnds.push(i - 1);
+                }
+            }
+        }
+
+        this.currentIndex = 0;
+        this.notifyWordChange();
+        this.notifyProgress();
+    }
+
+    /**
+     * Jump to a specific index (for anchor navigation)
+     * @param {number} index - The index to jump to
+     */
+    jumpToIndex(index) {
+        if (index >= 0 && index < this.items.length) {
+            this.currentIndex = index;
+            this.easeInCount = 0;
+            this.notifyWordChange();
+            this.notifyProgress();
+        }
     }
 
     /**
@@ -99,11 +162,10 @@ export class RSVPEngine {
     getInterval() {
         const baseInterval = 60000 / this.wpm;
 
-        // Ease-in: gradually increase speed over first 5 words
         if (this.easeInCount < 5) {
             const easeFactors = [0.5, 0.6, 0.7, 0.85, 1.0];
             const factor = easeFactors[this.easeInCount];
-            return baseInterval / factor; // Slower = longer interval
+            return baseInterval / factor;
         }
 
         return baseInterval;
@@ -115,17 +177,37 @@ export class RSVPEngine {
     play() {
         if (this.isPlaying) return;
 
+        // If resuming from paused special content, skip to next item
+        if (this.specialPaused) {
+            this.specialPaused = false;
+            this.isShowingSpecialContent = false;
+            if (this.onSpecialContentEnd) {
+                this.onSpecialContentEnd();
+            }
+            this.isPlaying = true;
+            this.notifyStateChange();
+            this.advanceToNext();
+            return;
+        }
+
         // If at the end, start over from the beginning
-        if (this.currentIndex >= this.words.length - 1) {
+        if (this.currentIndex >= this.items.length - 1) {
             this.currentIndex = 0;
             this.notifyWordChange();
             this.notifyProgress();
         }
 
         this.isPlaying = true;
-        this.easeInCount = 0; // Reset ease-in on play
+        this.easeInCount = 0;
         this.notifyStateChange();
-        this.scheduleNext();
+
+        // If current item is special content, show it with countdown
+        const currentItem = this.items[this.currentIndex];
+        if (currentItem && currentItem.type === 'special') {
+            this.showSpecialContent(currentItem);
+        } else {
+            this.scheduleNext();
+        }
     }
 
     /**
@@ -133,6 +215,17 @@ export class RSVPEngine {
      */
     pause() {
         if (!this.isPlaying) return;
+
+        // If showing special content, stop countdown but keep content visible
+        if (this.countdownIntervalId) {
+            clearInterval(this.countdownIntervalId);
+            this.countdownIntervalId = null;
+            this.specialPaused = true;
+            // Hide countdown badge when paused
+            if (this.onSpecialCountdownTick) {
+                this.onSpecialCountdownTick(null); // null indicates hidden
+            }
+        }
 
         this.isPlaying = false;
         if (this.timeoutId) {
@@ -158,10 +251,27 @@ export class RSVPEngine {
      */
     stop() {
         this.pause();
+        this.clearSpecialContent();
         this.currentIndex = 0;
         this.easeInCount = 0;
         this.notifyWordChange();
         this.notifyProgress();
+    }
+
+    /**
+     * Clear special content state
+     */
+    clearSpecialContent() {
+        if (this.countdownIntervalId) {
+            clearInterval(this.countdownIntervalId);
+            this.countdownIntervalId = null;
+        }
+        this.specialCountdown = 0;
+        this.specialPaused = false;
+        this.isShowingSpecialContent = false;
+        if (this.onSpecialContentEnd) {
+            this.onSpecialContentEnd();
+        }
     }
 
     /**
@@ -177,60 +287,233 @@ export class RSVPEngine {
     }
 
     /**
-     * Advance to the next word
+     * Advance to the next item (skip paragraph breaks)
+     */
+    advanceToNext() {
+        this.currentIndex++;
+        while (this.currentIndex < this.items.length &&
+               this.items[this.currentIndex].type === 'paragraph-break') {
+            this.currentIndex++;
+        }
+
+        if (this.currentIndex < this.items.length) {
+            this.processCurrentItem();
+        } else {
+            this.pause();
+        }
+    }
+
+    /**
+     * Advance to the next word/item
      */
     advance() {
-        if (this.currentIndex < this.words.length - 1) {
-            // Check if we just finished a paragraph
+        if (this.currentIndex < this.items.length - 1) {
+            const currentItem = this.items[this.currentIndex];
             const wasAtParagraphEnd = this.paragraphEnds.includes(this.currentIndex);
 
             this.currentIndex++;
+
+            // Skip paragraph break items
+            if (this.items[this.currentIndex]?.type === 'paragraph-break') {
+                if (this.onParagraphBreak) {
+                    this.onParagraphBreak();
+                }
+                this.timeoutId = setTimeout(() => {
+                    this.currentIndex++;
+                    if (this.currentIndex < this.items.length) {
+                        this.processCurrentItem();
+                    } else {
+                        this.pause();
+                    }
+                }, 500);
+                return;
+            }
+
+            this.processCurrentItem();
+        } else {
+            this.pause();
+        }
+    }
+
+    /**
+     * Process the current item based on its type
+     */
+    processCurrentItem() {
+        const item = this.items[this.currentIndex];
+        if (!item) {
+            this.pause();
+            return;
+        }
+
+        if (item.type === 'special') {
+            this.showSpecialContent(item);
+        } else if (item.type === 'word') {
             this.easeInCount++;
             this.notifyWordChange();
             this.notifyProgress();
-
-            // If we crossed a paragraph boundary, show a break
-            if (wasAtParagraphEnd && this.onParagraphBreak) {
-                this.onParagraphBreak();
-                // Add extra delay for paragraph break (500ms)
-                this.timeoutId = setTimeout(() => {
-                    this.scheduleNext();
-                }, 500);
-            } else {
-                this.scheduleNext();
-            }
-        } else {
-            // Reached the end
-            this.pause();
+            this.scheduleNext();
+        } else if (item.type === 'paragraph-break') {
+            // Should be handled in advance(), but just in case
+            this.advanceToNext();
         }
+    }
+
+    /**
+     * Show special content with countdown
+     * @param {Object} item - Special content item
+     */
+    showSpecialContent(item) {
+        // Clear any existing timers to prevent double-scheduling
+        if (this.timeoutId) {
+            clearTimeout(this.timeoutId);
+            this.timeoutId = null;
+        }
+        if (this.countdownIntervalId) {
+            clearInterval(this.countdownIntervalId);
+            this.countdownIntervalId = null;
+        }
+
+        this.specialCountdown = SPECIAL_CONTENT_DURATION;
+        this.specialPaused = false;
+        this.isShowingSpecialContent = true;
+
+        if (this.onSpecialContent) {
+            this.onSpecialContent(item, this.specialCountdown);
+        }
+
+        this.countdownIntervalId = setInterval(() => {
+            this.specialCountdown--;
+
+            if (this.onSpecialCountdownTick) {
+                this.onSpecialCountdownTick(this.specialCountdown);
+            }
+
+            if (this.specialCountdown <= 0) {
+                this.endSpecialContent();
+            }
+        }, 1000);
+    }
+
+    /**
+     * End special content display and continue
+     */
+    endSpecialContent() {
+        if (this.countdownIntervalId) {
+            clearInterval(this.countdownIntervalId);
+            this.countdownIntervalId = null;
+        }
+
+        this.isShowingSpecialContent = false;
+
+        if (this.onSpecialContentEnd) {
+            this.onSpecialContentEnd();
+        }
+
+        this.notifyProgress();
+        this.advanceToNext();
+    }
+
+    /**
+     * Skip special content if currently showing, and continue reading
+     * @returns {boolean} true if special content was skipped
+     */
+    skipSpecialContent() {
+        if (this.isShowingSpecialContent) {
+            this.endSpecialContent();
+            return true;
+        }
+        return false;
     }
 
     /**
      * Jump to previous sentence
      */
     previousSentence() {
+        this.clearSpecialContent();
         const wasPaused = !this.isPlaying;
+        const startIndex = this.currentIndex;
+        const now = Date.now();
 
-        // Find the sentence start before current position
-        let targetStart = 0;
+        // Find current word index (counting only words)
+        let currentWordIndex = 0;
+        for (let i = 0; i < this.currentIndex; i++) {
+            if (this.items[i].type === 'word') currentWordIndex++;
+        }
+
+        // Find the sentence start index (in sentenceStarts array) before current position
+        let targetSentenceIdx = 0;
         for (let i = this.sentenceStarts.length - 1; i >= 0; i--) {
-            if (this.sentenceStarts[i] < this.currentIndex) {
-                // If we're at the start of a sentence, go to previous one
-                if (this.currentIndex === this.sentenceStarts[i + 1]) {
-                    targetStart = this.sentenceStarts[i];
-                } else {
-                    targetStart = this.sentenceStarts[i];
-                }
+            if (this.sentenceStarts[i] < currentWordIndex) {
+                targetSentenceIdx = i;
                 break;
             }
         }
 
-        this.currentIndex = targetStart;
-        this.easeInCount = 0; // Reset ease-in after jump
+        // Rapid back-press detection (play mode only):
+        // If pressed again within 800ms after jumping to a sentence, go to the one before it
+        const timeSinceLastBack = now - this.lastBackPressTime;
+        const rapidBackPress = !wasPaused &&
+                               (timeSinceLastBack < 800) &&
+                               (this.lastSkipToSentenceIdx >= 0) &&
+                               (targetSentenceIdx === this.lastSkipToSentenceIdx) &&
+                               (targetSentenceIdx > 0);
+
+        if (rapidBackPress) {
+            targetSentenceIdx = targetSentenceIdx - 1;
+        }
+
+        const targetWordIndex = this.sentenceStarts[targetSentenceIdx];
+
+        // Find item index for this word index
+        let wordCount = 0;
+        let targetIndex = 0;
+        for (let i = 0; i < this.items.length; i++) {
+            if (this.items[i].type === 'word') {
+                if (wordCount === targetWordIndex) {
+                    targetIndex = i;
+                    break;
+                }
+                wordCount++;
+            }
+        }
+
+        console.log(`[prevSentence] targetIndex=${targetIndex} (searching for special between ${startIndex - 1} and ${targetIndex})`);
+
+        // Check for special content between target and current (show last one first when going back)
+        for (let i = startIndex - 1; i >= targetIndex; i--) {
+            if (this.items[i].type === 'special') {
+                this.currentIndex = i;
+                this.easeInCount = 0;
+                this.notifyProgress();
+                if (wasPaused) {
+                    // In paused mode, just navigate to it without countdown
+                    this.notifyWordChange();
+                } else {
+                    // In playing mode, show with countdown
+                    this.showSpecialContent(this.items[i]);
+                }
+                // Reset rapid back-press tracking when special content is involved
+                this.lastBackPressTime = 0;
+                this.lastSkipToSentenceIdx = -1;
+                return;
+            }
+        }
+
+        this.currentIndex = targetIndex;
+        this.easeInCount = 0;
         this.notifyWordChange();
         this.notifyProgress();
 
-        // If was playing, reschedule
+        // Track for rapid back-press detection (play mode only, reset if special content involved)
+        const cameFromSpecial = this.items[startIndex]?.type === 'special';
+        if (wasPaused || cameFromSpecial) {
+            this.lastBackPressTime = 0;
+            this.lastSkipToSentenceIdx = -1;
+        } else {
+            this.lastBackPressTime = now;
+            this.lastSkipToSentenceIdx = targetSentenceIdx;
+        }
+
         if (!wasPaused && this.isPlaying) {
             if (this.timeoutId) clearTimeout(this.timeoutId);
             this.scheduleNext();
@@ -241,23 +524,63 @@ export class RSVPEngine {
      * Jump to next sentence
      */
     nextSentence() {
+        this.clearSpecialContent();
         const wasPaused = !this.isPlaying;
+        const startIndex = this.currentIndex;
 
-        // Find the next sentence start after current position
-        let targetStart = this.currentIndex;
+        // Find current word index
+        let currentWordIndex = 0;
+        for (let i = 0; i < this.currentIndex; i++) {
+            if (this.items[i].type === 'word') currentWordIndex++;
+        }
+
+        // Find the next sentence start
+        let targetWordIndex = currentWordIndex;
         for (const start of this.sentenceStarts) {
-            if (start > this.currentIndex) {
-                targetStart = start;
+            if (start > currentWordIndex) {
+                targetWordIndex = start;
                 break;
             }
         }
 
-        this.currentIndex = Math.min(targetStart, this.words.length - 1);
-        this.easeInCount = 0; // Reset ease-in after jump
+        // Find item index for this word index
+        let wordCount = 0;
+        let targetIndex = this.currentIndex;
+        for (let i = 0; i < this.items.length; i++) {
+            if (this.items[i].type === 'word') {
+                if (wordCount === targetWordIndex) {
+                    targetIndex = i;
+                    break;
+                }
+                wordCount++;
+            }
+        }
+
+        targetIndex = Math.min(targetIndex, this.items.length - 1);
+
+
+        // Check for special content between current and target
+        for (let i = startIndex + 1; i <= targetIndex; i++) {
+            if (this.items[i].type === 'special') {
+                this.currentIndex = i;
+                this.easeInCount = 0;
+                this.notifyProgress();
+                if (wasPaused) {
+                    // In paused mode, just navigate to it without countdown
+                    this.notifyWordChange();
+                } else {
+                    // In playing mode, show with countdown
+                    this.showSpecialContent(this.items[i]);
+                }
+                return;
+            }
+        }
+
+        this.currentIndex = targetIndex;
+        this.easeInCount = 0;
         this.notifyWordChange();
         this.notifyProgress();
 
-        // If was playing, reschedule
         if (!wasPaused && this.isPlaying) {
             if (this.timeoutId) clearTimeout(this.timeoutId);
             this.scheduleNext();
@@ -268,8 +591,13 @@ export class RSVPEngine {
      * Move to previous word
      */
     previousWord() {
+        this.clearSpecialContent();
         if (this.currentIndex > 0) {
             this.currentIndex--;
+            // Skip paragraph breaks
+            while (this.currentIndex > 0 && this.items[this.currentIndex].type === 'paragraph-break') {
+                this.currentIndex--;
+            }
             this.notifyWordChange();
             this.notifyProgress();
         }
@@ -279,8 +607,14 @@ export class RSVPEngine {
      * Move to next word
      */
     nextWord() {
-        if (this.currentIndex < this.words.length - 1) {
+        this.clearSpecialContent();
+        if (this.currentIndex < this.items.length - 1) {
             this.currentIndex++;
+            // Skip paragraph breaks
+            while (this.currentIndex < this.items.length - 1 &&
+                   this.items[this.currentIndex].type === 'paragraph-break') {
+                this.currentIndex++;
+            }
             this.notifyWordChange();
             this.notifyProgress();
         }
@@ -291,42 +625,119 @@ export class RSVPEngine {
      * @returns {string}
      */
     getCurrentWord() {
-        return this.words[this.currentIndex] || '';
+        const item = this.items[this.currentIndex];
+        if (item?.type === 'word') {
+            return item.value;
+        }
+        return '';
     }
 
     /**
-     * Get context words around current position
-     * @param {number} count - Number of words before and after
-     * @returns {{words: Array<{word: string, offset: number}>, currentOffset: number}}
+     * Get the current item
+     * @returns {Object|null}
+     */
+    getCurrentItem() {
+        return this.items[this.currentIndex] || null;
+    }
+
+    /**
+     * Get context items around current position (words and special content)
+     * @param {number} count - Number of items before and after
+     * @returns {{words: Array<{word: string, offset: number, type?: string, html?: string, contentType?: string}>, currentOffset: number}}
      */
     getContext(count = 20) {
         const result = [];
-        const start = Math.max(0, this.currentIndex - count);
-        const end = Math.min(this.words.length - 1, this.currentIndex + count);
+
+        // Find displayable items around current position (words and special content)
+        let currentItemPos = 0;
+        const displayItems = [];
+
+        for (let i = 0; i < this.items.length; i++) {
+            const item = this.items[i];
+            if (item.type === 'word') {
+                displayItems.push({ index: i, word: item.value, type: 'word' });
+            } else if (item.type === 'special') {
+                displayItems.push({
+                    index: i,
+                    type: 'special',
+                    contentType: item.contentType,
+                    html: item.html
+                });
+            }
+            if (i === this.currentIndex) {
+                currentItemPos = displayItems.length - 1;
+            }
+        }
+
+        const start = Math.max(0, currentItemPos - count);
+        const end = Math.min(displayItems.length - 1, currentItemPos + count);
 
         for (let i = start; i <= end; i++) {
-            result.push({
-                word: this.words[i],
-                offset: i - this.currentIndex
-            });
+            const item = displayItems[i];
+            if (item.type === 'word') {
+                result.push({
+                    word: item.word,
+                    offset: i - currentItemPos,
+                    type: 'word'
+                });
+            } else {
+                result.push({
+                    offset: i - currentItemPos,
+                    type: 'special',
+                    contentType: item.contentType,
+                    html: item.html
+                });
+            }
         }
 
         return {
             words: result,
-            currentOffset: this.currentIndex - start
+            currentOffset: currentItemPos - start
         };
     }
 
     /**
      * Get progress information
-     * @returns {{current: number, total: number, percent: number}}
+     * @returns {{current: number, total: number, percent: number, specialCount: number}}
      */
     getProgress() {
-        const total = this.words.length;
-        const current = this.currentIndex + 1;
+        // Count only words and special content for progress
+        let total = 0;
+        let current = 0;
+        let specialCount = 0;
+
+        for (let i = 0; i < this.items.length; i++) {
+            const item = this.items[i];
+            if (item.type === 'word' || item.type === 'special') {
+                total++;
+                if (i <= this.currentIndex) current++;
+                if (item.type === 'special') specialCount++;
+            }
+        }
+
+        // Count remaining special items for time estimate
+        let remainingSpecialCount = 0;
+        for (let i = this.currentIndex + 1; i < this.items.length; i++) {
+            if (this.items[i].type === 'special') remainingSpecialCount++;
+        }
+
         const percent = total > 0 ? (current / total) * 100 : 0;
 
-        return { current, total, percent };
+        return {
+            current,
+            total,
+            percent,
+            specialCount,
+            remainingSpecialCount
+        };
+    }
+
+    /**
+     * Get all items
+     * @returns {Array}
+     */
+    getItems() {
+        return this.items;
     }
 
     /**

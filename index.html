@@ -7,12 +7,28 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="hidden">
+        <div class="loading-spinner"></div>
+        <p id="loading-status">Loading article...</p>
+    </div>
+
     <header>
         <h1>Word Runner</h1>
         <p>Speed reading with RSVP and ORP highlighting</p>
+        <p id="source-url" class="hidden">
+            Reading: <a id="source-link" href="#" target="_blank" rel="noopener"></a>
+        </p>
     </header>
 
     <main>
+        <!-- Error Display -->
+        <div id="error-display" class="hidden">
+            <h3>Could not load article</h3>
+            <p id="error-message"></p>
+            <button id="dismiss-error-btn">Use default text</button>
+        </div>
+
         <!-- Word Display Area -->
         <div class="display-area">
             <!-- Single word display (shown when playing) -->
@@ -22,6 +38,12 @@
 
             <!-- Context display (shown when paused) -->
             <div id="context-display" class="hidden"></div>
+
+            <!-- Special content overlay (images, code, tables) -->
+            <div id="special-content-overlay" class="hidden">
+                <div id="special-content-container"></div>
+                <div id="countdown-badge">5</div>
+            </div>
         </div>
 
         <!-- Progress -->
