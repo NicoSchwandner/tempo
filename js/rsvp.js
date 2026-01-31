@@ -9,7 +9,7 @@ const DEFAULT_TEXT = `The quick brown fox jumps over the lazy dog. This classic 
 
 Speed reading is a collection of methods that increase reading rates without compromising comprehension. RSVP is one of the most effective techniques available. By presenting words one at a time in a fixed position, your eyes don't need to move across the page. This eliminates saccades, the quick eye movements between words, which typically consume about 10% of reading time.
 
-The Optimal Recognition Point helps your brain process each word faster. Research shows that we don't read every letter in a word. Instead, our brain recognizes word shapes and key letters. By centering the ORP and highlighting it, Word Runner helps you focus on exactly the right spot.
+The Optimal Recognition Point helps your brain process each word faster. Research shows that we don't read every letter in a word. Instead, our brain recognizes word shapes and key letters. By centering the ORP and highlighting it, Tempo helps you focus on exactly the right spot.
 
 Try adjusting the speed to find your optimal reading pace. Most people can comfortably read at 250-350 WPM with practice. Some experienced speed readers achieve 500-700 WPM while maintaining good comprehension.
 

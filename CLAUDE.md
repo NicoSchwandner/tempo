@@ -1,4 +1,4 @@
-# Word Runner - RSVP Reader
+# Tempo - RSVP Reader
 
 ## Project Overview
 A web-based RSVP (Rapid Serial Visual Presentation) reader with ORP (Optimal Recognition Point) highlighting. Displays one word at a time with the optimal recognition point marked in red. Supports loading articles directly from URLs.
@@ -10,7 +10,7 @@ A web-based RSVP (Rapid Serial Visual Presentation) reader with ORP (Optimal Rec
 
 ## Project Structure
 ```
-word-runner/
+tempo/
 ├── index.html          # Main application
 ├── css/style.css       # Styling
 └── js/

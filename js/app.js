@@ -1,5 +1,5 @@
 /**
- * Word Runner - Main Application
+ * Tempo - Main Application
  */
 
 import { splitAtORP } from './orp.js';
@@ -7,7 +7,7 @@ import { RSVPEngine } from './rsvp.js';
 import { extractURLFromPath, fetchContent } from './url-loader.js';
 import { parseHTMLToContent } from './content-parser.js';
 
-const STORAGE_KEY_WPM = 'word-runner-wpm';
+const STORAGE_KEY_WPM = 'tempo-wpm';
 const DEFAULT_WPM = 250;
 
 // Display states
@@ -19,7 +19,7 @@ const DISPLAY_STATE = {
     SPECIAL: 'special'
 };
 
-class WordRunnerApp {
+class TempoApp {
     constructor() {
         this.engine = new RSVPEngine();
         this.elements = {};
@@ -621,5 +621,5 @@ class WordRunnerApp {
 
 // Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-    window.app = new WordRunnerApp();
+    window.app = new TempoApp();
 });

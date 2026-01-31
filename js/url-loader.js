@@ -3,7 +3,7 @@
  *
  * Supports two URL formats:
  * 1. Hash-based (for development): http://localhost:8000/#https://example.com/article
- * 2. Path-based (for production):  http://word-runner.com/https://example.com/article
+ * 2. Path-based (for production):  http://tempo.com/https://example.com/article
  */
 
 // Multiple CORS proxies for fallback

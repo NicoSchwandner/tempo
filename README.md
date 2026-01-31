@@ -1,6 +1,6 @@
-# Word Runner
+# Tempo
 
-A speed reading application using RSVP (Rapid Serial Visual Presentation) with ORP (Optimal Recognition Point) highlighting. Load any article from the web and read it at your optimal pace.
+A speed reading application using RSVP (Rapid Serial Visual Presentation) with ORP (Optimal Recognition Point) highlighting. Load any article from the web and read it at your own tempo.
 
 ## What is RSVP?
 
@@ -8,7 +8,7 @@ Rapid Serial Visual Presentation displays one word at a time in a fixed position
 
 ## What is ORP?
 
-The Optimal Recognition Point is the letter in each word where your eye naturally focuses for fastest recognition. Word Runner highlights this letter in red and centers it on the screen, reducing cognitive load.
+The Optimal Recognition Point is the letter in each word where your eye naturally focuses for fastest recognition. Tempo highlights this letter in red and centers it on the screen, reducing cognitive load.
 
 ## Features
 
@@ -25,7 +25,7 @@ The Optimal Recognition Point is the letter in each word where your eye naturall
 
 ## URL Loading
 
-Load any article by adding its URL to Word Runner.
+Load any article by adding its URL to Tempo.
 
 ### Development (hash-based)
 
@@ -42,8 +42,8 @@ http://localhost:8000/#https://en.wikipedia.org/wiki/RSVP
 With a proper web server that routes all paths to index.html:
 
 ```
-https://word-runner.com/https://example.com/article
-https://word-runner.com/www.example.com/article
+https://tempo.example.com/https://example.com/article
+https://tempo.example.com/www.example.com/article
 ```
 
 ### With Anchor Links
