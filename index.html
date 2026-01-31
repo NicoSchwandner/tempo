@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Word Runner - RSVP Speed Reader</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header>
+        <h1>Word Runner</h1>
+        <p>Speed reading with RSVP and ORP highlighting</p>
+    </header>
+
+    <main>
+        <!-- Word Display Area -->
+        <div class="display-area">
+            <!-- Single word display (shown when playing) -->
+            <div id="word-display">
+                <span id="word-before"></span><span id="word-orp"></span><span id="word-after"></span>
+            </div>
+
+            <!-- Context display (shown when paused) -->
+            <div id="context-display" class="hidden"></div>
+        </div>
+
+        <!-- Progress -->
+        <div class="progress-container">
+            <div class="progress-bar-bg">
+                <div id="progress-bar"></div>
+            </div>
+            <div id="progress-text">0 / 0</div>
+        </div>
+
+        <!-- Controls -->
+        <div class="controls">
+            <button id="play-pause-btn" aria-label="Play">Play</button>
+            <button id="start-over-btn" aria-label="Start Over">Start Over</button>
+
+            <div class="wpm-control">
+                <label for="wpm-slider">Speed:</label>
+                <input type="range" id="wpm-slider" min="100" max="1000" step="25" value="250">
+                <span id="wpm-value">250 WPM</span>
+                <button id="reset-wpm-btn" aria-label="Reset WPM">Reset</button>
+            </div>
+        </div>
+
+        <!-- Keyboard Shortcuts -->
+        <div class="shortcuts">
+            <h4>Keyboard Shortcuts</h4>
+            <div class="shortcuts-grid">
+                <div class="shortcut">
+                    <kbd>Space</kbd>
+                    <span>Play / Pause</span>
+                </div>
+                <div class="shortcut">
+                    <kbd>←</kbd>
+                    <span>Previous sentence</span>
+                </div>
+                <div class="shortcut">
+                    <kbd>→</kbd>
+                    <span>Next sentence</span>
+                </div>
+                <div class="shortcut">
+                    <kbd>↑</kbd>
+                    <span>Increase WPM</span>
+                </div>
+                <div class="shortcut">
+                    <kbd>↓</kbd>
+                    <span>Decrease WPM</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Text Input -->
+        <div class="text-input-section">
+            <h3>Custom Text</h3>
+            <textarea id="text-input" placeholder="Paste your text here..."></textarea>
+            <div class="text-buttons">
+                <button id="submit-text-btn">Load Text</button>
+                <button id="reset-text-btn">Reset to Default</button>
+            </div>
+        </div>
+    </main>
+
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>
