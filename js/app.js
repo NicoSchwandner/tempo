@@ -40,6 +40,7 @@ class WordRunnerApp {
         if (urlInfo) {
             await this.loadFromURL(urlInfo.url, urlInfo.anchor);
         } else {
+            this.showTextInputSection(true);
             this.updateWPMDisplay();
             this.updateProgress(this.engine.getProgress());
             this.updateDisplayState(DISPLAY_STATE.PAUSED);
@@ -59,6 +60,7 @@ class WordRunnerApp {
 
             this.sourceUrl = finalUrl;
             this.showSourceURL(finalUrl, title);
+            this.showTextInputSection(false);
 
             this.engine.setContent(items);
 
@@ -110,7 +112,12 @@ class WordRunnerApp {
             progressText: document.getElementById('progress-text'),
             timeRemaining: document.getElementById('time-remaining'),
 
+            // Navigation
+            customTextBtn: document.getElementById('custom-text-btn'),
+            loadUrlBtn: document.getElementById('load-url-btn'),
+
             // Text input
+            textInputSection: document.getElementById('text-input-section'),
             textInput: document.getElementById('text-input'),
             submitTextBtn: document.getElementById('submit-text-btn'),
             resetTextBtn: document.getElementById('reset-text-btn'),
@@ -167,6 +174,20 @@ class WordRunnerApp {
         this.elements.resetTextBtn.addEventListener('click', () => {
             this.resetText();
         });
+
+        // Custom Text navigation button
+        if (this.elements.customTextBtn) {
+            this.elements.customTextBtn.addEventListener('click', () => {
+                this.showCustomTextMode();
+            });
+        }
+
+        // Load URL navigation button
+        if (this.elements.loadUrlBtn) {
+            this.elements.loadUrlBtn.addEventListener('click', () => {
+                this.promptLoadUrl();
+            });
+        }
 
         // Dismiss error button
         if (this.elements.dismissErrorBtn) {
@@ -544,6 +565,36 @@ class WordRunnerApp {
         this.elements.wpmSlider.value = DEFAULT_WPM;
         this.engine.setWPM(DEFAULT_WPM);
         this.updateWPMDisplay();
+    }
+
+    // Show/hide text input section
+    showTextInputSection(show) {
+        if (this.elements.textInputSection) {
+            this.elements.textInputSection.classList.toggle('hidden', !show);
+        }
+    }
+
+    // Navigate to custom text mode (root URL)
+    showCustomTextMode() {
+        // Clear URL hash and navigate to root
+        window.location.hash = '';
+        this.sourceUrl = null;
+        if (this.elements.sourceUrl) {
+            this.elements.sourceUrl.classList.add('hidden');
+        }
+        this.showTextInputSection(true);
+        this.engine.setText(this.engine.getDefaultText());
+        this.updateDisplayState(DISPLAY_STATE.PAUSED);
+        this.updateDisplay();
+        this.updateProgress(this.engine.getProgress());
+    }
+
+    // Prompt user for URL and load it
+    promptLoadUrl() {
+        const url = prompt('Enter article URL:');
+        if (url && url.trim()) {
+            window.location.hash = url.trim();
+        }
     }
 }
 

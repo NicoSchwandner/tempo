@@ -16,6 +16,10 @@
     <header>
         <h1>Word Runner</h1>
         <p>Speed reading with RSVP and ORP highlighting</p>
+        <div class="nav-buttons">
+            <button id="custom-text-btn">Custom Text</button>
+            <button id="load-url-btn">Load URL</button>
+        </div>
         <p id="source-url" class="hidden">
             Reading: <a id="source-link" href="#" target="_blank" rel="noopener"></a>
         </p>
@@ -97,8 +101,8 @@
             </div>
         </div>
 
-        <!-- Text Input -->
-        <div class="text-input-section">
+        <!-- Text Input (hidden when URL is loaded) -->
+        <div id="text-input-section" class="text-input-section">
             <h3>Custom Text</h3>
             <textarea id="text-input" placeholder="Paste your text here..."></textarea>
             <div class="text-buttons">

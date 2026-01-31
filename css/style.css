@@ -43,6 +43,19 @@ header p {
     font-size: 0.95rem;
 }
 
+/* Navigation Buttons */
+.nav-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
+.nav-buttons button {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+}
+
 /* Source URL */
 #source-url {
     font-size: 0.85rem;
@@ -473,6 +486,10 @@ button:active {
 .text-input-section {
     width: 100%;
     margin-top: 1rem;
+}
+
+.text-input-section.hidden {
+    display: none;
 }
 
 .text-input-section h3 {
