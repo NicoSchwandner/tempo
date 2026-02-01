@@ -6,7 +6,7 @@
  * 2. Path-based (for production):  http://tempo.com/https://example.com/article
  */
 
-// Multiple CORS proxies for fallback
+// Multiple CORS proxies - tried in parallel, first success wins
 const CORS_PROXIES = [
     {
         name: 'allorigins',
@@ -21,6 +21,25 @@ const CORS_PROXIES = [
     {
         name: 'corsproxy.io',
         url: 'https://corsproxy.io/?',
+        parseResponse: async (response) => ({
+            html: await response.text(),
+            finalUrl: null
+        }),
+        isRawResponse: true
+    },
+    {
+        name: 'corsanywhere',
+        url: 'https://cors-anywhere.herokuapp.com/',
+        parseResponse: async (response) => ({
+            html: await response.text(),
+            finalUrl: response.headers.get('x-final-url') || null
+        }),
+        isRawResponse: true,
+        prependUrl: true // URL is appended directly, not encoded
+    },
+    {
+        name: 'codetabs',
+        url: 'https://api.codetabs.com/v1/proxy?quest=',
         parseResponse: async (response) => ({
             html: await response.text(),
             finalUrl: null
@@ -137,8 +156,77 @@ function detectErrorPage(html) {
 }
 
 /**
+ * Try fetching via a single proxy
+ * @param {Object} proxy - Proxy configuration
+ * @param {string} url - Target URL
+ * @returns {Promise<{html: string, finalUrl: string, proxyName: string}>}
+ */
+async function fetchViaProxy(proxy, url) {
+    const proxyUrl = proxy.prependUrl
+        ? proxy.url + url
+        : proxy.url + encodeURIComponent(url);
+
+    const response = await fetch(proxyUrl);
+
+    if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+    }
+
+    let html, finalUrl;
+
+    if (proxy.isRawResponse) {
+        const result = await proxy.parseResponse(response);
+        html = result.html;
+        finalUrl = result.finalUrl || url;
+    } else {
+        const data = await response.json();
+
+        if (proxy.isError && proxy.isError(data)) {
+            throw new Error(proxy.getErrorMsg(data));
+        }
+
+        const result = proxy.parseResponse(data);
+        html = result.html;
+        finalUrl = result.finalUrl || url;
+    }
+
+    // Check if the content is an error page
+    const errorMsg = detectErrorPage(html);
+    if (errorMsg) {
+        throw new ContentError(errorMsg);
+    }
+
+    return { html, finalUrl, proxyName: proxy.name };
+}
+
+/**
+ * Race multiple promises, returning the first successful one
+ * Unlike Promise.race, this waits for success, not just first settlement
+ * @param {Promise[]} promises - Promises to race
+ * @returns {Promise} First successful result, or aggregated error if all fail
+ */
+function raceToSuccess(promises) {
+    return new Promise((resolve, reject) => {
+        const errors = [];
+        let pending = promises.length;
+
+        promises.forEach((promise, index) => {
+            promise
+                .then(resolve)
+                .catch(error => {
+                    errors[index] = error;
+                    pending--;
+                    if (pending === 0) {
+                        reject(errors);
+                    }
+                });
+        });
+    });
+}
+
+/**
  * Fetch content from a URL
- * Tries direct fetch first, falls back to multiple CORS proxies
+ * Tries direct fetch first, then races all CORS proxies in parallel
  * @param {string} url - The URL to fetch
  * @returns {Promise<{html: string, finalUrl: string}>}
  */
@@ -156,6 +244,7 @@ export async function fetchContent(url) {
             if (errorMsg) {
                 throw new ContentError(errorMsg);
             }
+            console.log('Direct fetch succeeded');
             return { html, finalUrl: response.url };
         }
     } catch (e) {
@@ -163,61 +252,39 @@ export async function fetchContent(url) {
         if (e instanceof ContentError) {
             throw e;
         }
-        console.log('Direct fetch failed, trying CORS proxies');
+        console.log('Direct fetch failed, racing CORS proxies in parallel');
     }
 
-    // Try each CORS proxy
-    const errors = [];
-    for (const proxy of CORS_PROXIES) {
-        try {
-            console.log(`Trying ${proxy.name} proxy...`);
-            const proxyUrl = proxy.url + encodeURIComponent(url);
-            const response = await fetch(proxyUrl);
+    // Race all proxies in parallel - first success wins
+    console.log(`Racing ${CORS_PROXIES.length} proxies: ${CORS_PROXIES.map(p => p.name).join(', ')}`);
 
-            if (!response.ok) {
-                errors.push(`${proxy.name}: HTTP ${response.status}`);
-                continue;
-            }
+    const proxyPromises = CORS_PROXIES.map(proxy =>
+        fetchViaProxy(proxy, url).catch(error => {
+            console.log(`${proxy.name} failed: ${error.message}`);
+            throw { proxy: proxy.name, error };
+        })
+    );
 
-            let html, finalUrl;
-
-            if (proxy.isRawResponse) {
-                const result = await proxy.parseResponse(response);
-                html = result.html;
-                finalUrl = result.finalUrl || url;
-            } else {
-                const data = await response.json();
-
-                if (proxy.isError && proxy.isError(data)) {
-                    errors.push(`${proxy.name}: ${proxy.getErrorMsg(data)}`);
-                    continue;
-                }
-
-                const result = proxy.parseResponse(data);
-                html = result.html;
-                finalUrl = result.finalUrl || url;
-            }
-
-            // Check if the content is an error page
-            const errorMsg = detectErrorPage(html);
-            if (errorMsg) {
-                errors.push(`${proxy.name}: ${errorMsg}`);
-                continue;
-            }
-
-            console.log(`${proxy.name} proxy succeeded`);
-            return { html, finalUrl };
-
-        } catch (e) {
-            errors.push(`${proxy.name}: ${e.message}`);
-            console.log(`${proxy.name} proxy failed:`, e.message);
+    try {
+        const result = await raceToSuccess(proxyPromises);
+        console.log(`${result.proxyName} won the race`);
+        return { html: result.html, finalUrl: result.finalUrl };
+    } catch (errors) {
+        // All proxies failed - check for content errors first
+        const contentError = errors.find(e => e?.error instanceof ContentError);
+        if (contentError) {
+            throw new Error(contentError.error.message);
         }
-    }
 
-    // All proxies failed
-    const errorSummary = errors.join('; ');
-    if (errorSummary.includes('bot protection')) {
-        throw new Error('This site has bot protection and cannot be loaded.');
+        // Summarize errors
+        const errorMessages = errors
+            .filter(e => e)
+            .map(e => `${e.proxy}: ${e.error?.message || e.error}`);
+
+        if (errorMessages.some(msg => msg.includes('bot protection'))) {
+            throw new Error('This site has bot protection and cannot be loaded.');
+        }
+
+        throw new Error(`Could not fetch article. All ${CORS_PROXIES.length} proxies failed.`);
     }
-    throw new Error(`Could not fetch article. ${errors[errors.length - 1] || 'All proxies failed.'}`);
 }
