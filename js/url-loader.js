@@ -1,9 +1,10 @@
 /**
  * URL Loader - Handles URL extraction and content fetching
  *
- * Supports two URL formats:
- * 1. Hash-based (for development): http://localhost:8000/#https://example.com/article
- * 2. Path-based (for production):  http://tempo.com/https://example.com/article
+ * Supports three URL formats:
+ * 1. Query param (for share target): http://tempo.com/?url=https://example.com/article
+ * 2. Hash-based (for development):   http://localhost:8000/#https://example.com/article
+ * 3. Path-based (for production):    http://tempo.com/https://example.com/article
  */
 
 // Multiple CORS proxies - tried in parallel, first success wins
@@ -50,11 +51,18 @@ const CORS_PROXIES = [
 
 /**
  * Extract URL from the current location
- * Checks hash first (for dev), then path (for production with proper routing)
+ * Checks query param first (for share target), then hash (dev), then path (production)
  * @returns {{url: string, anchor: string}|null} The extracted URL and anchor, or null if not found
  */
 export function extractURLFromPath() {
-    // Try hash first (for development with simple http server)
+    // Try query param first (for Web Share Target API)
+    const params = new URLSearchParams(window.location.search);
+    const sharedUrl = params.get('url');
+    if (sharedUrl) {
+        return parseURLString(sharedUrl);
+    }
+
+    // Try hash (for development with simple http server)
     const hash = window.location.hash.slice(1); // Remove #
     if (hash) {
         return parseURLString(hash);

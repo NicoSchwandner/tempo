@@ -31,6 +31,7 @@ make help     # Show available commands
 
 ## Key Features
 - **URL Loading**: Load any article URL
+  - Share target (PWA): `/?url=https://...` (for mobile share sheet)
   - Development (hash): `/#https://...`, `/#www...`, `/#domain.com/...`
   - Production (path): `/https://...`, `/www...`, `/domain.com/...`
   - Anchor support: `/#url#section` (depends on source preserving element IDs)
