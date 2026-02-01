@@ -55,9 +55,10 @@ const CORS_PROXIES = [
  * @returns {{url: string, anchor: string}|null} The extracted URL and anchor, or null if not found
  */
 export function extractURLFromPath() {
-    // Try query param first (for Web Share Target API)
+    // Try query params first (for Web Share Target API)
+    // Some browsers put URL in 'url', others in 'text'
     const params = new URLSearchParams(window.location.search);
-    const sharedUrl = params.get('url');
+    const sharedUrl = params.get('url') || params.get('text');
     if (sharedUrl) {
         return parseURLString(sharedUrl);
     }

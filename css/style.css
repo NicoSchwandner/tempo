@@ -696,13 +696,6 @@ button:active {
     color: var(--text-primary);
 }
 
-/* Hide bookmarklet on mobile (can't drag to bookmarks bar) */
-@media (max-width: 600px) {
-    .bookmarklet-section {
-        display: none;
-    }
-}
-
 /* Mobile Controls - hidden by default */
 .mobile-controls {
     display: none;
@@ -715,7 +708,8 @@ button:active {
         display: none;
     }
 
-    .shortcuts {
+    .shortcuts,
+    .bookmarklet-section {
         display: none;
     }
 
