@@ -696,6 +696,11 @@ button:active {
     color: var(--text-primary);
 }
 
+/* iOS Shortcut Section - hidden on desktop, shown on mobile */
+.ios-shortcut-section {
+    display: none;
+}
+
 /* Mobile Controls - hidden by default */
 .mobile-controls {
     display: none;
@@ -711,6 +716,69 @@ button:active {
     .shortcuts,
     .bookmarklet-section {
         display: none;
+    }
+
+    /* Show iOS shortcut section on mobile */
+    .ios-shortcut-section {
+        display: block;
+        margin-top: 1.5rem;
+        padding: 1rem;
+        background-color: var(--bg-secondary);
+        border-radius: 8px;
+        width: 100%;
+    }
+
+    .ios-shortcut-section h4 {
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+        color: var(--text-secondary);
+    }
+
+    .ios-shortcut-section > p {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        margin-bottom: 0.75rem;
+    }
+
+    .shortcut-help {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+    }
+
+    .shortcut-help summary {
+        cursor: pointer;
+        color: var(--text-primary);
+        margin-bottom: 0.75rem;
+    }
+
+    .shortcut-help ol {
+        margin-left: 1.25rem;
+        line-height: 1.8;
+    }
+
+    .shortcut-help li {
+        margin-bottom: 0.5rem;
+    }
+
+    .shortcut-help code {
+        display: block;
+        margin-top: 0.25rem;
+        background: var(--bg-tertiary);
+        padding: 0.4rem 0.6rem;
+        border-radius: 4px;
+        font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
+        font-size: 0.75rem;
+        word-break: break-all;
+        color: var(--text-primary);
+    }
+
+    .shortcut-tip {
+        margin-top: 1rem;
+        padding: 0.75rem;
+        background: var(--bg-tertiary);
+        border-radius: 6px;
+        color: var(--text-primary);
+        font-size: 0.85rem;
     }
 
     /* Show mobile controls */
