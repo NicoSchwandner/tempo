@@ -3,7 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Speed read any article with RSVP and optimal recognition point highlighting">
+    <meta name="theme-color" content="#1a1a2e">
     <title>Tempo - RSVP Speed Reader</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/favicon.svg">
+    <link rel="manifest" href="/manifest.json">
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -79,7 +84,7 @@
             </div>
         </div>
 
-        <!-- Keyboard Shortcuts -->
+        <!-- Keyboard Shortcuts (hidden on mobile) -->
         <div class="shortcuts">
             <h4>Keyboard Shortcuts</h4>
             <div class="shortcuts-grid">
@@ -103,6 +108,22 @@
                     <kbd>↓</kbd>
                     <span>Decrease WPM</span>
                 </div>
+            </div>
+        </div>
+
+        <!-- Mobile Controls (hidden on desktop) -->
+        <div class="mobile-controls">
+            <div class="mobile-nav-row">
+                <button class="mobile-btn" id="m-prev-sentence" aria-label="Previous sentence">««</button>
+                <button class="mobile-btn" id="m-prev-word" aria-label="Previous word">‹</button>
+                <button class="mobile-btn play-btn" id="m-play-pause" aria-label="Play">▶</button>
+                <button class="mobile-btn" id="m-next-word" aria-label="Next word">›</button>
+                <button class="mobile-btn" id="m-next-sentence" aria-label="Next sentence">»»</button>
+            </div>
+            <div class="mobile-wpm-row">
+                <button class="mobile-btn" id="m-wpm-down" aria-label="Decrease speed">−</button>
+                <span class="mobile-wpm-value" id="m-wpm-value">250 WPM</span>
+                <button class="mobile-btn" id="m-wpm-up" aria-label="Increase speed">+</button>
             </div>
         </div>
 

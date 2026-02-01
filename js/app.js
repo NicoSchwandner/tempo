@@ -139,7 +139,17 @@ class TempoApp {
             // Special content
             specialOverlay: document.getElementById('special-content-overlay'),
             specialContainer: document.getElementById('special-content-container'),
-            countdownBadge: document.getElementById('countdown-badge')
+            countdownBadge: document.getElementById('countdown-badge'),
+
+            // Mobile controls
+            mobilePlayPause: document.getElementById('m-play-pause'),
+            mPrevSentence: document.getElementById('m-prev-sentence'),
+            mNextSentence: document.getElementById('m-next-sentence'),
+            mPrevWord: document.getElementById('m-prev-word'),
+            mNextWord: document.getElementById('m-next-word'),
+            mWpmDown: document.getElementById('m-wpm-down'),
+            mWpmUp: document.getElementById('m-wpm-up'),
+            mWpmValue: document.getElementById('m-wpm-value')
         };
     }
 
@@ -229,6 +239,51 @@ class TempoApp {
                 this.loadFromURL(urlInfo.url, urlInfo.anchor);
             }
         });
+
+        // Mobile controls
+        this.elements.mobilePlayPause?.addEventListener('click', () => this.engine.toggle());
+        this.elements.mPrevSentence?.addEventListener('click', () => this.engine.previousSentence());
+        this.elements.mNextSentence?.addEventListener('click', () => {
+            if (!this.engine.skipSpecialContent()) {
+                this.engine.nextSentence();
+            }
+        });
+        this.elements.mPrevWord?.addEventListener('click', () => this.engine.previousWord());
+        this.elements.mNextWord?.addEventListener('click', () => this.engine.nextWord());
+
+        // Mobile WPM buttons with long-press support
+        this.setupLongPressWPM(this.elements.mWpmDown, -25);
+        this.setupLongPressWPM(this.elements.mWpmUp, 25);
+
+        // Tap display area to toggle on mobile
+        document.querySelector('.display-area')?.addEventListener('click', (e) => {
+            if (window.innerWidth <= 600 && !e.target.closest('#special-content-overlay')) {
+                this.engine.toggle();
+            }
+        });
+    }
+
+    setupLongPressWPM(button, delta) {
+        if (!button) return;
+
+        let intervalId = null;
+        const start = () => {
+            this.adjustWPM(delta);
+            intervalId = setInterval(() => this.adjustWPM(delta), 150);
+        };
+        const stop = () => {
+            if (intervalId) {
+                clearInterval(intervalId);
+                intervalId = null;
+            }
+        };
+
+        button.addEventListener('touchstart', (e) => { e.preventDefault(); start(); }, { passive: false });
+        button.addEventListener('touchend', stop);
+        button.addEventListener('touchcancel', stop);
+        button.addEventListener('mousedown', start);
+        button.addEventListener('mouseup', stop);
+        button.addEventListener('mouseleave', stop);
     }
 
     handleWheel(e) {
@@ -509,10 +564,22 @@ class TempoApp {
     updatePlayButton(isPlaying) {
         this.elements.playPauseBtn.textContent = isPlaying ? 'Pause' : 'Play';
         this.elements.playPauseBtn.setAttribute('aria-label', isPlaying ? 'Pause' : 'Play');
+
+        // Sync mobile play button
+        if (this.elements.mobilePlayPause) {
+            this.elements.mobilePlayPause.textContent = isPlaying ? '❚❚' : '▶';
+            this.elements.mobilePlayPause.setAttribute('aria-label', isPlaying ? 'Pause' : 'Play');
+        }
     }
 
     updateWPMDisplay() {
-        this.elements.wpmValue.textContent = `${this.elements.wpmSlider.value} WPM`;
+        const wpmText = `${this.elements.wpmSlider.value} WPM`;
+        this.elements.wpmValue.textContent = wpmText;
+
+        // Sync mobile WPM display
+        if (this.elements.mWpmValue) {
+            this.elements.mWpmValue.textContent = wpmText;
+        }
     }
 
     updateProgress(progress) {
